@@ -9,27 +9,19 @@ local CYAN=$'%{\e[00;36m%}'
 local WHITE=$'%{\e[00;37m%}'
 
 ##### Prompt Settings #####
-PROMPT=$RED'[%n@%m]'$YELLOW'[%d]'$GREEN'
-> '$WHITE
+PROMPT=$RED'[%n@%m]'$YELLOW'[%d]'$CYAN'[Ruby:`ruby --version | cut -d " " -f 2`]'$MAGENTA'[Gem:`rvm gemset name | cut -d "/" -f 1`]'$GREEN'
+♪ '$WHITE
 
 ##### Set Env #####
 export SHELL=zsh
 export LANG=ja_JP.UTF-8
 export LC_ALL=ja_JP.UTF-8
-export PATH=$HOME/bin:/opt/local/bin:$HOME/code/:$PATH
+export PATH=$HOME/bin:/usr/local/bin:$PATH
 export EDITOR=`which vim`
 export SVN_EDITOR=$EDITOR
-export PAGER=lv
 export LISTMAX=10000
 export LD_LIBRARY_PATH=/usr/local/lib
 export LD_FLAGS=/usr/local/lib
-
-#export RUBYPATH=/usr/lib/:/usr/local/lib
-#export RUBYLIB=/usr/lib/ruby/1.8:/usr/lcaol/lib
-#export GEM_HOME=/usr/lib/ruby/gems/1.8
-export RUBYPATH=
-export RUBYLIB=
-export GEM_HOME=/home/naoto/.gem/ruby/1.8
 
 setopt nocheckjobs
 
@@ -38,6 +30,11 @@ _cache_hosts=(`perl -ne  'if (/^([a-zA-Z0-9.-]+)/) { print "$1\n";}' ~/.ssh/know
 
 autoload -U compinit
 compinit
+source ~/.zsh/script/cdd
+
+function chpwd() {
+  _reg_pwd_screennum
+}
 
 zstyle ':completion:*:sudo:*' command-path $PATH
 zstyle ':completion:*:default' menu select=1
@@ -82,11 +79,6 @@ bindkey "^H"    backward-delete-char
 bindkey "^[[3~" backward-delete-char
 bindkey "^[[3~" delete-char
 
-
-##### Network Default Settings #####
-#export http_proxy=""
-#export HTTP_HOME="http://www.google.co.jp/"
-
 ##### Set Global Aliases #####
 alias -g V='| vi -R -'
 alias -g G='| grep '
@@ -97,16 +89,6 @@ alias mv='nocorrect mv'
 alias rm='nocorrect rm'
 alias mkdir='nocorrect mkdir'
 
-alias la='ls -lAh --color'
-alias ls='ls -F --color'
-alias ll='ls -lh --color'
-
-# Subversion Aliases
-alias svns='svn status'
-alias svnr='svn revert'
-alias svnp='svn propset svn:keywords Id'
-alias svnd='svn diff'
-alias mono='/usr/local/bin/mono'
 # Application Aliases
 alias w3m='w3m -B'
 
@@ -200,3 +182,34 @@ if [ `expr $TERM : screen` ]; then
     screen -X title `echo $1 | cut -d " " -f 1`
   }
 fi
+
+[[ -s "$HOME/.rvm/scripts/rvm" ]] && . "$HOME/.rvm/scripts/rvm"
+
+#Git
+autoload -Uz add-zsh-hook
+autoload -Uz colors
+colors
+autoload -Uz vcs_info
+
+zstyle ':vcs_info:*' enable git svn hg bzr
+zstyle ':vcs_info:*' formats '(%s)-[%b]'
+zstyle ':vcs_info:*' actionformats '(%s)-[%b|%a]'
+zstyle ':vcs_info:(svn:bzr):*' branchformat '%b:r&r'
+zstyle ':vcs_info:bzr:*' use-simple true
+
+autoload -Uz is-at-least
+if is-at-least 4.3.10; then
+  zstyle ':vcs_info:git:*' check-for-changes true
+  zstyle ':vcs_info:git:*' stagedstr "+" 
+  zstyle ':vcs_info:git:*' unstagedstr "-"
+  zstyle ':vcs_info:git:*' formats '(%s)-[%b] %c%u'
+  zstyle ':vcs_info:git:*' actionformats '(%s)-[%b|%a] %c%u'
+fi
+
+function _update_vcs_info_msg() {
+  psvar=()
+  LANG=en_US.UTF-8 vcs_info
+  [[ -n "$vcs_info_msg_0_" ]] && psvar[1]="$vcs_info_msg_0_"
+}
+add-zsh-hook precmd _update_vcs_info_msg
+RPROMPT="%1(v|%F{green}%1v%f|)"

@@ -9,32 +9,29 @@ local CYAN=$'%{\e[00;36m%}'
 local WHITE=$'%{\e[00;37m%}'
 
 ##### Prompt Settings #####
-PROMPT=$RED'[%n@%m]'$YELLOW'[%d]'$CYAN'[Ruby:`ruby --version | cut -d " " -f 2`]'$MAGENTA'[Gem:`rvm gemset name | cut -d "/" -f 1`]'$GREEN'
-♪ '$WHITE
+PROMPT=$RED'[%n@%m]'$YELLOW'[%d]'$CYAN'[Ruby:`ruby --version | cut -d " " -f 2`]'$MAGENTA'[Gem:`rvm gemset name | cut -d "/" -f 1`]'$GREEN' 
+> '$WHITE
 
 ##### Set Env #####
 export SHELL=zsh
 export LANG=ja_JP.UTF-8
-export LC_ALL=ja_JP.UTF-8
-export PATH=$HOME/bin:/usr/local/bin:$PATH
+export LC_ALL=$LANG
 export EDITOR=`which vim`
+export LS_COLORS='di=01;36'
+export KERNEL=`uname`
+export PATH=$HOME/bin:/usr/local/bin:$HOME/.bundles/bin:$PATH
 export SVN_EDITOR=$EDITOR
 export LISTMAX=10000
-export LD_LIBRARY_PATH=/usr/local/lib
-export LD_FLAGS=/usr/local/lib
 
-setopt nocheckjobs
+export TERM="xterm-256color"
 
-###### Auto Completion Settings #####
-_cache_hosts=(`perl -ne  'if (/^([a-zA-Z0-9.-]+)/) { print "$1\n";}' ~/.ssh/known_hosts`)
+autoload -U colors
+colors
 
 autoload -U compinit
 compinit
-source ~/.zsh/script/cdd
 
-function chpwd() {
-  _reg_pwd_screennum
-}
+autoload -Uz zmv
 
 zstyle ':completion:*:sudo:*' command-path $PATH
 zstyle ':completion:*:default' menu select=1
@@ -46,8 +43,11 @@ zstyle ':completion:*:messages' format '%d'
 zstyle ':completion:*:warnings' format 'No matches for: %d'
 zstyle ':completion:*' group-name ''
 
-autoload -U colors
-colors
+#Git
+autoload -Uz add-zsh-hook
+autoload -Uz vcs_info
+
+setopt nocheckjobs
 
 ###### Tetris Settings #####
 autoload -U tetris
@@ -56,15 +56,61 @@ zle -N tetris
 ###### zsh function Editor zed #####
 autoload zed
 
-##### Set Shell Options #####
-setopt auto_menu auto_cd correct auto_name_dirs auto_remove_slash
-setopt extended_history hist_ignore_dups hist_ignore_space prompt_subst
-setopt pushd_ignore_dups rm_star_silent sun_keyboard_hack
-setopt extended_glob list_types no_beep always_last_prompt
-setopt cdable_vars sh_word_split auto_param_keys share_history
-setopt long_list_jobs magic_equal_subst auto_pushd
+###### Auto Completion Settings #####
+_cache_hosts=(`perl -ne  'if (/^([a-zA-Z0-9.-]+)/) { print "$1\n";}' ~/.ssh/known_hosts`)
 
+##### Set Shell Options #####
+# タブで候補をトグルする
+setopt auto_menu
+# ディレクトリ名で移動
+setopt auto_cd
+# 自動修正機能
+setopt correct
+# ~$var でディレクトリにアクセス
+setopt auto_name_dirs
+# 接尾辞うぃ削除する
+setopt auto_remove_slash
+# 開始/終了タイムスタンプを書き込み
+setopt extended_history
+# 直前のヒストリと全く同じとき無視
+setopt hist_ignore_dups
+# 先頭がスペースで始まるとき無視
+setopt hist_ignore_space
+# プロンプト内で変数展開
+setopt prompt_subst
+# 重複するディレクトリを無視
+setopt pushd_ignore_dups
+# rm * を実行する前に確認
+setopt rm_star_silent
+# 行末のバッククウォートを無視
+setopt sun_keyboard_hack
+# W~^ を正規表現として扱う
+setopt extended_glob
+# ファイル種別を表す記号を末尾に表示
+setopt list_types
+# ベルを鳴らさない
+setopt no_beep
+# 無駄なスクロールを避ける
+setopt always_last_prompt
+# 先頭に ~ を付けたもので展開
+setopt cdable_vars
+# 変数内の文字列分解のデリミタ
+setopt sh_word_split
+# 変数名を保管する
+setopt auto_param_keys
+setopt share_history
+setopt long_list_jobs
+# val=expr でファイル名展開
+setopt magic_equal_subst
+# cd したら自動的に pushd する
+setopt auto_pushd
 setopt nonomatch
+
+source ~/.zsh/script/cdd
+
+function chpwd() {
+  _reg_pwd_screennum
+}
 
 ##### History Settings #####
 HISTFILE=$HOME/.zsh-history
@@ -78,19 +124,16 @@ bindkey "^?"    backward-delete-char
 bindkey "^H"    backward-delete-char
 bindkey "^[[3~" backward-delete-char
 bindkey "^[[3~" delete-char
-
-##### Set Global Aliases #####
-alias -g V='| vi -R -'
-alias -g G='| grep '
+bindkey "^Q"    push-line-or-edit
+bindkey "^R"    history-incremental-search-backword 
 
 ##### Set Aliases #####
 alias cp='nocorrect cp'
 alias mv='nocorrect mv'
 alias rm='nocorrect rm'
 alias mkdir='nocorrect mkdir'
-
-# Application Aliases
-alias w3m='w3m -B'
+alias gst='git status -s -b'
+alias ls='ls --color'
 
 # Suffix Aliases
 alias -s txt='vi'
@@ -99,98 +142,108 @@ alias -s log='tail -f'
 alias -s tgz='tar zxvf'
 alias -s tar.gz='tar zxvf'
 
-alias screen="TERM=screen screen -U"
-
-function ssh_screen(){
-  screen -X title $1
-  ssh $1
-}
+alias screen="TERM=screen screen"
 
 ##### Set Functions #####
 # Function For Screen
-function ssh_screen() {
-    eval server=\${$#}
-    screen -t $server ssh "$@"
-}
+#function ssh_screen() {
+#    cd $HOME
+#    eval server=\${$#}
+#    screen -U -t $server ssh "$@"
+#    cd -
+#}
 
-# Google Search
-function google() {
-    local str opt
-    if [ $# != 0 ]; then 
-        for i in $*; do
-            str="$str+$i"
-        done
-        str=`echo $str | sed 's/^\+//'`
-        opt='search?num=50&hl=ja&ie=euc-jp&oe=euc-jp&lr=lang_ja'
-        opt="${opt}&q=${str}"
-    fi
-    command w3m http://www.google.co.jp/$opt
-}
+function set_screen_window_title(){
+  emulate -L zsh
+  local -a cmd
+  cmd=($argv)
+  case $cmd[1] in
+    fg)
+      if (( $#cmd == 1 )); then
+        cmd=(builtin jobs -l %+)
+      else
+        cmd=(builtin jobs -l $cmd[2])
+      fi
+      ;;
+    %*)
+      cmd=(builtin jobs -l $cmd[1])
+      ;;
+    cd)
+      if (( $#cmd == 2)); then
+        cmd[1]=$cmd[2]
+      fi
+      ;&
+    *)
+      echo -n " k$cmd[1]: \\"
+      return
+      ;;
+  esac
 
+  local -A jtl jt=(${(kv)jobtexts})
+
+  $cmd >>(read num rest
+  cmd=(${(z)${(e):-\$jt$num}})
+  echo -n " k$cmd[1]:t \\") 2>/dev/null
+}
 # screen window title set at exec command
-if [ $TERM = xterm-256color ]; then
-    chpwd () { echo -n "_`dirs`\\" }
-    preexec() {
-        # see [zsh-workers:13180]
-        # http://www.zsh.org/mla/workers/2000/msg03993.html
-        emulate -L zsh
-        local -a cmd; cmd=(${(z)2})
-        case $cmd[1] in
-            fg)
-                if (( $#cmd == 1 )); then
-                    cmd=(builtin jobs -l %+)
-                else
-                    cmd=(builtin jobs -l $cmd[2])
-                fi
-                ;;
-            %*) 
-                cmd=(builtin jobs -l $cmd[1])
-                ;;
-            cd)
-                if (( $#cmd == 2)); then
-                    cmd[1]=$cmd[2]
-                fi
-                ;&
-            *)
-                echo -n "k$cmd[1]:t\\"
-                return
-                ;;
-        esac
-
-        local -A jt; jt=(${(kv)jobtexts})
-
-        $cmd >>(read num rest
-                 cmd=(${(z)${(e):-\$jt$num}})
-                 echo -n "k$cmd[1]:t\\") 2>/dev/null
-    }
-    chpwd
-fi
-
+#if [ $TERM = xterm-256color ]; then
+#    chpwd () { echo -n "_`dirs`\\" }
+#    preexec() {
+#        # see [zsh-workers:13180]
+#        # http://www.zsh.org/mla/workers/2000/msg03993.html
+#        emulate -L zsh
+#        local -a cmd; cmd=(${(z)2})
+#        case $cmd[1] in
+#            fg)
+#                if (( $#cmd == 1 )); then
+#                    cmd=(builtin jobs -l %+)
+#                else
+#                    cmd=(builtin jobs -l $cmd[2])
+#                fi
+#                ;;
+#            %*) 
+#                cmd=(builtin jobs -l $cmd[1])
+#                ;;
+#            cd)
+#                if (( $#cmd == 2)); then
+#                    cmd[1]=$cmd[2]
+#                fi
+#                ;&
+#            *)
+#/                echo -n "k$cmd[1]:t\\"
+#                return
+#                ;;
+#        esac
+#
+#        local -A jt; jt=(${(kv)jobtexts})
+#
+#        $cmd >>(read num rest
+#                 cmd=(${(z)${(e):-\$jt$num}})
+#                 echo -n "k$cmd[1]:t\\") 2>/dev/null
+#    }
+#    chpwd
+#fi
 # GNU Screen AutoStart
-case "${TERM}" in
-  *xterm*|rxvt|(dt|k|E)term)
-    exec screen -U -D -xRR
-    ;;
-esac
+#case "${TERM}" in
+#  *xterm*|rxvt|(dt|k|E)term)
+#    exec screen -U -D -xRR
+#    ;;
+#esac
+#
+#if [ `expr $TERM : screen` ]; then
+#  alias ssh ssh_screen
+#  precmd(){
+#    screen -U -X title $(basename `echo $PWD | sed -e "s/ /_/g"`)
+#  }
+#  preexec(){
+#    screen -U -X title `echo $1 | cut -d " " -f 1`
+#  }
+#fi
 
-if [ `expr $TERM : screen` ]; then
-  alias ssh ssh_screen
-  precmd(){
-    screen -X title $(basename `echo $PWD | sed -e "s/ /_/g"`)
-  }
-  preexec(){
-    screen -X title `echo $1 | cut -d " " -f 1`
-  }
-fi
-
+# rvm parameter
 [[ -s "$HOME/.rvm/scripts/rvm" ]] && . "$HOME/.rvm/scripts/rvm"
 
-#Git
-autoload -Uz add-zsh-hook
-autoload -Uz colors
-colors
-autoload -Uz vcs_info
-
+# CVS parameter
 zstyle ':vcs_info:*' enable git svn hg bzr
 zstyle ':vcs_info:*' formats '(%s)-[%b]'
 zstyle ':vcs_info:*' actionformats '(%s)-[%b|%a]'
@@ -213,3 +266,49 @@ function _update_vcs_info_msg() {
 }
 add-zsh-hook precmd _update_vcs_info_msg
 RPROMPT="%1(v|%F{green}%1v%f|)"
+
+# 起動時256カラー表示
+256colors2.pl
+
+#case "${TERM}" in
+#screen)
+#    TERM=xterm
+#    ;;
+#esac
+
+#case "${TERM}" in
+#xterm|xterm-color)
+#    export LSCOLORS=exfxcxdxbxegedabagacad
+#    export LS_COLORS='di=36:ln=35:so=32:pi=33:ex=31:bd=46;34:cd=43;34:su=41;30:sg=46;30:tw=42;30:ow=43;30'
+#    zstyle ':completion:*' list-colors 'di=36' 'ln=35' 'so=32' 'ex=31' 'bd=46;34' 'cd=43;34'
+#    ;;
+#kterm-color)
+#    stty erase '^H'
+#    export LSCOLORS=exfxcxdxbxegedabagacad
+#    export LS_COLORS='di=36:ln=35:so=32:pi=33:ex=31:bd=46;34:cd=43;34:su=41;30:sg=46;30:tw=42;30:ow=43;30'
+#    zstyle ':completion:*' list-colors 'di=36' 'ln=35' 'so=32' 'ex=31' 'bd=46;34' 'cd=43;34'
+#    ;;
+#kterm)
+#    stty erase '^H'
+#    ;;
+#cons25)
+#    unset LANG
+#    export LSCOLORS=ExFxCxdxBxegedabagacad
+#    export LS_COLORS='di=01;36:ln=01;35:so=01;32:ex=01;31:bd=46;34:cd=43;34:su=41;30:sg=46;30:tw=42;30:ow=43;30'
+#    zstyle ':completion:*' list-colors 'di=;36;1' 'ln=;35;1' 'so=;32;1' 'ex=31;1' 'bd=46;34' 'cd=43;34'
+#    ;;
+#jfbterm-color)
+#    export LSCOLORS=gxFxCxdxBxegedabagacad
+#    export LS_COLORS='di=01;36:ln=01;35:so=01;32:ex=01;31:bd=46;34:cd=43;34:su=41;30:sg=46;30:tw=42;30:ow=43;30'
+#    zstyle ':completion:*' list-colors 'di=;36;1' 'ln=;35;1' 'so=;32;1' 'ex=31;1' 'bd=46;34' 'cd=43;34'
+#    ;;
+#esac
+
+# set terminal title including current directory
+#case "${TERM}" in
+#xterm|xterm-color|kterm|kterm-color)
+#    precmd() {
+#        echo -ne "\033]0;${USER}@${HOST%%.*}:${PWD}\007"
+#    }
+#    ;;
+#esac
